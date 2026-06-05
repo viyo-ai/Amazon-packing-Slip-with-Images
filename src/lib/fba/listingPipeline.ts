@@ -1467,11 +1467,13 @@ export async function judgeBrandSafetyLLM(
   openai: OpenAI,
 ): Promise<{ detected: BrandSafetyFinding[] }> {
   if (!text || !text.trim()) return { detected: [] }
-  // PR #81: upgraded gpt-4.1-mini → gpt-5 after live B0G884ZJ27 verification of #80
-  // showed gpt-4.1-mini returned empty findings on prompts that LITERALLY listed
-  // Homelander / Ripcurl / Iration / Ella Fella as examples to flag. The smaller model
-  // lacked classification reliability for this proper-noun-recognition task. gpt-5 is
-  // ~same cost ($0.001/call) on short input/output and demonstrably better at recall.
+  // PR #81: judge model is env-configurable. Default 'gpt-5' (much better recall on
+  // proper-noun classification than gpt-4.1-mini, which returned empty findings on
+  // live B0G884ZJ27 even with Homelander/Ripcurl/Iration listed as examples). Manus
+  // must enable GPT-5 access on the OpenAI org for the default to work; otherwise
+  // override via BRAND_SAFETY_JUDGE_MODEL env var. A runtime failure here is logged
+  // (so Coolify shows whether it's an access issue vs a prompt issue) and fails open.
+  const judgeModel = process.env.BRAND_SAFETY_JUDGE_MODEL || 'gpt-5'
   const system = `You are a STRICT Amazon trademark-safety judge. Find every third-party brand, registered trademark, sports team, university, media franchise, character name, band/musician, or other proper-noun reference that this seller cannot legally use without a license.
 
 Rules:
