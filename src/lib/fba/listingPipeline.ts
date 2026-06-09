@@ -2232,9 +2232,22 @@ export async function runListingPipeline(input: PipelineInput): Promise<Pipeline
   // that MUST survive into the title verbatim — the agent kept paraphrasing it away.
   const { name: designName, source: designSource } = await extractDesignName(input)
 
+  // Apparel with a clear DESIGN NAME: don't FORCE a money keyword into the title when it is REDUNDANT
+  // with the design name — i.e. a longer paraphrase of the SAME design ("see you later alligator
+  // shirt" vs design "Later Gator"). Forcing both jams the design in twice = the "Later Gator See You
+  // Later Alligator" keyword-soup the PO rejected; the forced pin was overriding the designLine's
+  // "don't paraphrase the slogan" rule. Gate on TOKEN OVERLAP with the design name (NOT raw word count
+  // — an adversarial review caught that a length cutoff wrongly drops unrelated long keywords like
+  // "funny pickle gardening shirt" for a "Big Dill" design). A genuinely DIFFERENT high-volume keyword
+  // is kept; the dropped slogan still ranks via the backend pool (+ bullets when it fits).
+  const titleMustInclude = (apparelProduct && designName && mustInclude
+    && wordOverlapRatio(mustInclude, designName) >= 0.34)
+    ? undefined
+    : mustInclude
+
   // Stage 1 — Title
   onProgress('Writing title...')
-  const { title: finalTitle, problems: titleProblems, retried } = await runTitleAgent(input, candidates, attrs.searchKeyphrases, mustInclude, preferredAudience, attributePinFinal, topUpgradeKws, compatibilityBrands, designName)
+  const { title: finalTitle, problems: titleProblems, retried } = await runTitleAgent(input, candidates, attrs.searchKeyphrases, titleMustInclude, preferredAudience, attributePinFinal, topUpgradeKws, compatibilityBrands, designName)
 
   // Per-child capacity titles — ONLY for non-apparel families whose children span >=2 distinct
   // capacities (e.g. SD cards 64/128/256GB). Researched Amazon best practice: each child must
